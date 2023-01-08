@@ -27,6 +27,41 @@ def usage():
 
 _home = os.environ["HOME"]
 _cfgtempl = f"{_home}/.ssh/%s.sshcfg"
+_nametempl = "%1s-%2s"
+
+def find_by_name(srch, lst):
+    "Search list lst for a .name == srch), return idx, -1 if not found."
+    idx = 0
+    for elem in lst:
+        if elem.name == srch:
+            return idx
+        idx += 1
+    return -1
+
+def fill_values(shost, sshnm, osrv, oconn):
+    shost.name = sshnm
+    ipaddr = osrv.get_ip()
+    if ipaddr:
+        shost.hostname = osrv.get_ip()
+    if not shost.user:
+        osrv.collectinfo2(oconn)
+        if osrv.usernm:
+            shost.user = osrv.usernm
+    # Any magic to fill in fwd_agent?
+    if osrv.keypair and not shost.id_file:
+        keyfile = find_sshkeyfile(osrv.keypair)
+        if keyfile:
+            shost.id_file = keyfile
+
+def ssh_host_from_srv(osrv, oconn, sshnm=None):
+    if not sshnm:
+        sshnm = osrv.name
+    shost = sshhosts.SSHhost()
+    fill_values(shost, sshnm, osrv, oconn)
+    if shost.hostname:
+        return shost
+    else:
+        return None
 
 def process_cloud(cnm):
     sshfn = _cfgtempl % cnm
@@ -34,14 +69,20 @@ def process_cloud(cnm):
     if os.access(sshfn, os.R_OK):
         ssh_hosts = sshhosts.collect_sshhosts(sshfn)
         nserv = len(nserv)
+    else:
+        ssh_hosts = []
     try:
         conn = openstack.connect(cnm, timeout = 24)
     except:
         return nserv
     os_servers = servers.collect_servers(conn)
     for srv in os_servers:
-        #if srv.name in ssh_hosts
-        print(srv)
+        sshnm = _nametempl % (cnm, srv.name)
+        idx = find_by_name(sshnm, ssh_hosts)
+        if idx == -1:
+            newhost = ssh_host_from_srv(srv, conn, sshnm)
+            if newhost:
+                ssh_hosts.append(newhost)
     return len(os_servers)
 
 def main(argv):

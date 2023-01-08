@@ -60,6 +60,15 @@ class OStackServer:
         return f"uid={self.uid}, name={self.name}, ipaddrs={self.ipaddrs}, " \
 		f"keypair={self.keypair}, flavor={self.flavor}, image={self.image}, " \
 		f"usernm={self.usernm}"
+    def get_ip(self):
+        """Determine reachable IP address:
+         - If we are in the same subnet and can reach a fixed ip, use it
+         - If we are in the same cloud and connected to a router with both subnets, use fixed ip
+         - Else use floating ip if there is one
+         - Else return None
+        """
+        pass
+
 
 def collect_servers(ostackconn, collectfull = False):
     """Uses ostackconn to get server list and returns a list of
