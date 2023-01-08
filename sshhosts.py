@@ -9,14 +9,15 @@
 # (c) Kurt Garloff <kurt@garloff.de>, 01/2023
 # SPDX-License-Identifier: Apache-2.0
 
-"""sshhosts contains class Host which parses and outputs again
+"""sshhosts contains class SSHhost which parses and outputs again
    some of the Host attributes from ssh config files.
-   readfile() returns"""
+   collect_sshhosts() returns list of SSHhost objects parsed
+   from the passed ssh config file."""
 
 #import os
 import sys
 
-class Host:
+class SSHhost:
     "class to parse and output some ssh Host settings"
     def __init__(self):
         "default c'tor"
@@ -76,13 +77,13 @@ class Host:
             out += f"\n{self.misc}"
         return out
 
-def readfile(fnm):
-    "Process ssh config file with filename fnm. Returns a list of Host objects."
+def collect_sshhosts(fnm):
+    "Process ssh config file with filename fnm. Returns a list of SSHhost objects."
     hosts = []
     processed = 0
     lns = open(fnm, "r", encoding='UTF-8').readlines()
     while processed < len(lns):
-        host = Host()
+        host = SSHhost()
         noln = host.parsecfg(lns[processed:])
         if not noln:
             break
@@ -94,7 +95,7 @@ def main(argv):
     "Entry point for testing"
     for fnm in argv:
         print(f"#FILE: {fnm}")
-        hosts = readfile(fnm)
+        hosts = collect_sshhosts(fnm)
         for host in hosts:
             print(f"{host}\n")
 
