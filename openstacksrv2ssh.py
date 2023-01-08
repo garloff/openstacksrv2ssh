@@ -72,13 +72,22 @@ def ssh_host_from_srv(osrv, oconn, sshnm=None):
         return shost
     return None
 
+def write_sshcfg(cnm, shosts):
+    "Write out ssh cfg file with hosts for cloud cnm"
+    sshfn = _cfgtempl % cnm
+    sshcf = open(sshfn, "w", encoding="UTF-8")
+    print("# SSH config file written by openstacksrv2ssh.py", file=sshcf)
+    print(f"# Hosts from cloud {cnm}\n", file=sshcf)
+    for shost in shosts:
+        print(f"{shost}\n", file=sshcf)
+
 def process_cloud(cnm):
     "Iterate over all servers in cloud and return list of SSHhost objects"
     sshfn = _cfgtempl % cnm
     nserv = 0
     if os.access(sshfn, os.R_OK):
         ssh_hosts = sshhosts.collect_sshhosts(sshfn)
-        nserv = len(nserv)
+        nserv = len(ssh_hosts)
         if DEBUG:
             print(f"Found {nserv} ssh hosts in {sshfn}", file=sys.stderr)
     else:
@@ -110,12 +119,14 @@ def process_cloud(cnm):
             if DEBUG:
                 print(f"Remove {shost.name} ({shortnm}) as it's not in OpenStack server list", file=sys.stderr)
             ssh_hosts.remove(shost)
-    # TODO: Write out sshfn
     if VERBOSE:
         print(f"# Servers from cloud {cnm}")
         for shost in ssh_hosts:
             print(f"{shost}\n")
+    if len(ssh_hosts) != 0:
+        write_sshcfg(cnm, ssh_hosts)
     return len(ssh_hosts)
+
 
 def main(argv):
     "Entry point for main program"
