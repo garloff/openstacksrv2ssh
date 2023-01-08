@@ -11,14 +11,17 @@
 
 "openstacksrv2ssh.py collects VMs from OpenStack to generate ssh config Host entries"
 
-import sshhosts
-from sshidentity import *
-import servers
+import os
+import sys
 import getopt
 import openstack
+import sshhosts
+import sshidentity
+import servers
 
 def usage():
-    print("Usage: openstacksrv2ssh.py -a | [ENV [ENV [...]]]")
+    "Help"
+    print("Usage: openstacksrv2ssh.py [-d] [-v] -a | [ENV [ENV [...]]]")
     print("Creates ~/.ssh/ENV.sshcfg files from OpenStack server lists.")
     print("-a iterates over all cloud configs known and also generates")
     print(" ~/.ssh/openstacksrv.sshcfg referencing all non-empty ones")
@@ -28,6 +31,9 @@ def usage():
 _home = os.environ["HOME"]
 _cfgtempl = f"{_home}/.ssh/%s.sshcfg"
 _nametempl = "%1s-%2s"
+
+DEBUG = False
+VERBOSE = False
 
 def find_by_name(srch, lst):
     "Search list lst for a .name == srch), return idx, -1 if not found."
@@ -39,8 +45,10 @@ def find_by_name(srch, lst):
     return -1
 
 def fill_values(shost, sshnm, osrv, oconn):
+    """Fill in SSHhost fields from osrv, with name sshnm,
+        using oconn to query more data if needed."""
     shost.name = sshnm
-    ipaddr = osrv.get_ip()
+    ipaddr = osrv.get_ip(DEBUG)
     if ipaddr:
         shost.hostname = osrv.get_ip()
     if not shost.user:
@@ -49,55 +57,85 @@ def fill_values(shost, sshnm, osrv, oconn):
             shost.user = osrv.usernm
     # Any magic to fill in fwd_agent?
     if osrv.keypair and not shost.id_file:
-        keyfile = find_sshkeyfile(osrv.keypair)
+        keyfile = sshidentity.find_sshkeyfile(osrv.keypair)
         if keyfile:
             shost.id_file = keyfile
 
 def ssh_host_from_srv(osrv, oconn, sshnm=None):
+    """Create new SSHhost object from osrv.
+       Only returns object if hostname is set."""
     if not sshnm:
         sshnm = osrv.name
     shost = sshhosts.SSHhost()
     fill_values(shost, sshnm, osrv, oconn)
     if shost.hostname:
         return shost
-    else:
-        return None
+    return None
 
 def process_cloud(cnm):
+    "Iterate over all servers in cloud and return list of SSHhost objects"
     sshfn = _cfgtempl % cnm
     nserv = 0
     if os.access(sshfn, os.R_OK):
         ssh_hosts = sshhosts.collect_sshhosts(sshfn)
         nserv = len(nserv)
+        if DEBUG:
+            print(f"Found {nserv} ssh hosts in {sshfn}", file=sys.stderr)
     else:
         ssh_hosts = []
+        if DEBUG:
+            print(f"No ssh hosts in {sshfn}", file=sys.stderr)
     try:
         conn = openstack.connect(cnm, timeout = 24)
     except:
         return nserv
     os_servers = servers.collect_servers(conn)
+    # Add / correct OpenStack servers
     for srv in os_servers:
         sshnm = _nametempl % (cnm, srv.name)
         idx = find_by_name(sshnm, ssh_hosts)
+        if DEBUG:
+            print(f"OpenStack Server {sshnm} in ssh list: {idx}")
         if idx == -1:
             newhost = ssh_host_from_srv(srv, conn, sshnm)
             if newhost:
                 ssh_hosts.append(newhost)
-    return len(os_servers)
+        else:
+            host = ssh_hosts[idx]
+            fill_values(host, sshnm, srv, conn)
+    # Remove servers that no longer exist
+    for shost in ssh_hosts:
+        shortnm = shost.name[len(cnm)+1:]
+        if find_by_name(shortnm, os_servers) == -1:
+            if DEBUG:
+                print(f"Remove {shost.name} ({shortnm}) as it's not in OpenStack server list", file=sys.stderr)
+            ssh_hosts.remove(shost)
+    # TODO: Write out sshfn
+    if VERBOSE:
+        print(f"# Servers from cloud {cnm}")
+        for shost in ssh_hosts:
+            print(f"{shost}\n")
+    return len(ssh_hosts)
 
 def main(argv):
+    "Entry point for main program"
     allclouds = False
+    global DEBUG, VERBOSE
     try:
-        optlist, args = getopt.gnu_getopt(argv, "ha", ("help", "all"))
+        optlist, args = getopt.gnu_getopt(argv, "havd", ("help", "all", "VERBOSE", "DEBUG"))
     except getopt.GetoptError as exc:
         print("Error:", exc, file=sys.stderr)
-        sys.exit(usage())
+        return usage()
     for opt in optlist:
         if opt[0] == "-h" or opt[0] == "--help":
             usage()
             sys.exit(0)
         elif opt[0] =="-a" or opt[0] == "--all":
             allclouds = True
+        elif opt[0] =="-v" or opt[0] == "--VERBOSE":
+            VERBOSE = True
+        elif opt[0] =="-d" or opt[0] == "--DEBUG":
+            DEBUG = True
         else:
             raise RuntimeError("option parser error")
     if not allclouds and not args:
@@ -106,8 +144,8 @@ def main(argv):
     if not allclouds and not args:
         sys.exit(usage())
     if allclouds:
-        print("-a not yet implemented!", file-sys.stderr)
-        sys.exit(1)
+        print("-a not yet implemented!", file=sys.stderr)
+        return 1
     processed = 0
     cloudhostfiles = []
     for cloud in args:
@@ -117,6 +155,7 @@ def main(argv):
             cloudhostfiles.append(_cfgtempl % cloud)
     if processed == 0:
         return 2
+    return 0
 
 
 if __name__ == "__main__":
