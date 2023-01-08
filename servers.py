@@ -60,14 +60,26 @@ class OStackServer:
         return f"uid={self.uid}, name={self.name}, ipaddrs={self.ipaddrs}, " \
 		f"keypair={self.keypair}, flavor={self.flavor}, image={self.image}, " \
 		f"usernm={self.usernm}"
-    def get_ip(self):
+    def get_ip(self, debug=False):
         """Determine reachable IP address:
          - If we are in the same subnet and can reach a fixed ip, use it
          - If we are in the same cloud and connected to a router with both subnets, use fixed ip
          - Else use floating ip if there is one
          - Else return None
         """
-        pass
+        #print(f"{self.ipaddrs}", file=sys.stderr)
+        #ipaddr = None
+        for netnm in self.ipaddrs:
+            ipnets = self.ipaddrs[netnm]
+            for netobj in ipnets:
+                #print(f"{netobj}", file=sys.stderr)
+                # For now only consider IPv4 and floating IP (unlike our plan above)
+                if netobj['version'] == 4 and netobj['OS-EXT-IPS:type'] == 'floating':
+                    ipaddr = netobj['addr']
+                    if debug:
+                        print(f"{ipaddr}", file=sys.stderr)
+                    return ipaddr
+        return None
 
 
 def collect_servers(ostackconn, collectfull = False):
