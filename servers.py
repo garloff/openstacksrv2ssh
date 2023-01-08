@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# vim: set ts=4 sw=4 et:
 #
 # servers.py
 #
@@ -8,11 +9,21 @@
 # (c) Kurt Garloff <kurt@garloff.de>
 # SPDX-License-Identifier: Apache-2.0
 
-import sys, os
+"""Implements class OStackServer which collects infos on
+   Servers (VMs) via the OpenStack API. Used to create
+   Host entries for ssh.
+   collect_servers() returns a list of OStackServer objects
+   collected by calling the passed OpenStack connection object.
+"""
+
+import sys
+import os
 import openstack
 
 class OStackServer:
+    "class collecting infos about servers (VMs) from OpenStack"
     def __init__(self):
+        "default c'tor"
         self.uid = None
         self.name = None
         self.ipaddrs = []
@@ -21,27 +32,39 @@ class OStackServer:
         self.image = None
         self.usernm = None
     def collectinfo(self, srvlistentry):
-        if srvlistentry.status != "ACTIVE":
-            return False
+        """extract information from passed server list entry,
+           does not fill in usernm"""
         self.uid = srvlistentry.id
         self.name = srvlistentry.name
         self.ipaddrs = srvlistentry.addresses
         self.keypair = srvlistentry.key_name
         self.flavor = srvlistentry.flavor["original_name"]
         self.image = srvlistentry.image.id
-        return True
+        return self
     def collectinfo2(self, ostackconn):
+        "investigate image properties to find ssh user name"
         if not self.image:
-            return
+            return self
         img = ostackconn.image.get_image(self.image)
         if "image_original_user" in img.properties:
             self.usernm = img.properties["image_original_user"]
-        # TODO: Guess image username based on image name
-    def __str__(self):
-        return f"uid={self.uid}, name={self.name}, ipaddrs={self.ipaddrs}, keypair={self.keypair}, " \
-                f"flavor={self.flavor}, image={self.image}, usernm={self.usernm}"
+        else:
+            # FIXME: Should we really guess image user names based on image name?
+            # ubuntu
+            if img.name[:6] == "Ubuntu" or img.name[:6] == "ubuntu":
+                self.usernm = "ubuntu"
+        return self
 
-def collectServers(ostackconn, collectfull = False):
+    def __str__(self):
+        "string representation for debugging"
+        return f"uid={self.uid}, name={self.name}, ipaddrs={self.ipaddrs}, " \
+		f"keypair={self.keypair}, flavor={self.flavor}, image={self.image}, " \
+		f"usernm={self.usernm}"
+
+def collect_servers(ostackconn, collectfull = False):
+    """Uses ostackconn to get server list and returns a list of
+       OStackServer objects. collectfull controls whether we also
+       do image API calls to get user names."""
     servers = []
     for srv in ostackconn.compute.servers():
         if srv.status != "ACTIVE":
@@ -54,6 +77,7 @@ def collectServers(ostackconn, collectfull = False):
     return servers
 
 def main(argv):
+    "main entry point for testing"
     cloud = None
     if "OS_CLOUD" in os.environ:
         cloud = os.environ["OS_CLOUD"]
@@ -65,12 +89,10 @@ def main(argv):
     if not cloud:
         print("You need to have OS_CLOUD set or pass --os-cloud=CLOUD.", file=sys.stderr)
     conn = openstack.connect(cloud = cloud, timeout=24)
-    servers = collectServers(conn, True)
-    #servers = collectServers(conn)
+    servers = collect_servers(conn, True)
+    #servers = collect_servers(conn)
     for srv in servers:
         print(srv)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-
-

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# vim: set ts=4 sw=4 et:
 #
 # sshhosts.py
 #
@@ -8,40 +9,51 @@
 # (c) Kurt Garloff <kurt@garloff.de>, 01/2023
 # SPDX-License-Identifier: Apache-2.0
 
-import os, sys
+"""sshhosts contains class Host which parses and outputs again
+   some of the Host attributes from ssh config files.
+   readfile() returns"""
+
+#import os
+import sys
 
 class Host:
+    "class to parse and output some ssh Host settings"
     def __init__(self):
+        "default c'tor"
         self.name = None
         self.hostname = None
-        self.idFile = None
+        self.id_file = None
         self.user = None
-        self.fwdAgent = False
+        self.fwd_agent = False
         self.misc = ""
-        
+
     def parsecfg(self, lines):
+        """Parse the passed lines for a Host entry. Uses first Host entry
+           found, unless self.name is already set in which case it looks
+           for a Host entry matching it. Stops parsing on next entry.
+           Returns number of lines advanced or 0 if nothing was found."""
         found = False
         parsed = 0
-        for ln in lines:
-            ln = ln.rstrip("\r\n")
+        for line in lines:
+            line = line.rstrip("\r\n")
             parsed += 1
-            if ln[:5] == "Host ":
+            if line[:5] == "Host ":
                 if found:
                     return parsed - 1
-                nm = ln[5:]
-                if self.name and self.name != nm:
+                name = line[5:]
+                if self.name and self.name != name:
                     continue
                 found = True
-                self.name = nm
+                self.name = name
             elif found:
-                cont = ln.lstrip("  ")
+                cont = line.lstrip("  ")
                 if cont[:9] == "Hostname ":
                     self.hostname = cont[9:]
                 elif cont[:13] == "ForwardAgent ":
                     if cont[13:16] == "yes":
-                        self.fwdAgent = True
+                        self.fwd_agent = True
                 elif cont[:13] == "IdentityFile ":
-                    self.idFile = cont[13:]
+                    self.id_file = cont[13:]
                 elif cont[:5] == "User ":
                     self.user = cont[5:]
                 else:
@@ -49,25 +61,26 @@ class Host:
                         self.misc = self.misc + "  " + cont + "\n"
         if found:
             return parsed
-        else:
-            return 0
-            
+        return 0
+
     def __str__(self):
+        "String output in ssh config file format"
         out = f"Host {self.name}\n  Hostname {self.hostname}"
         if self.user:
             out += f"\n  User {self.user}"
-        if self.idFile:
-            out += f"\n  IdentityFile {self.idFile}"
-        if self.fwdAgent:
-            out += f"\n  ForwardAgent yes"
+        if self.id_file:
+            out += f"\n  IdentityFile {self.id_file}"
+        if self.fwd_agent:
+            out += "\n  ForwardAgent yes"
         if self.misc != "":
             out += f"\n{self.misc}"
         return out
 
 def readfile(fnm):
+    "Process ssh config file with filename fnm. Returns a list of Host objects."
     hosts = []
     processed = 0
-    lns = open(fnm, "r").readlines()
+    lns = open(fnm, "r", encoding='UTF-8').readlines()
     while processed < len(lns):
         host = Host()
         noln = host.parsecfg(lns[processed:])
@@ -78,11 +91,12 @@ def readfile(fnm):
     return hosts
 
 def main(argv):
+    "Entry point for testing"
     for fnm in argv:
         print(f"#FILE: {fnm}")
         hosts = readfile(fnm)
         for host in hosts:
-            print("%s\n" % host)
+            print(f"{host}\n")
 
 if __name__ == "__main__":
     main(sys.argv[1:])
