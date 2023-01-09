@@ -33,6 +33,7 @@ _nametempl = "%1s-%2s"
 
 DEBUG = False
 VERBOSE = False
+QUIET = False
 
 def find_by_name(srch, lst):
     "Search list lst for a .name == srch), return idx, -1 if not found."
@@ -79,6 +80,8 @@ def write_sshcfg(cnm, shosts):
     print(f"# Hosts from cloud {cnm}\n", file=sshcf)
     for shost in shosts:
         print(f"{shost}\n", file=sshcf)
+    if not QUIET and len(shosts):
+        print(f"{len(shosts)} entries written to {sshfn}")
 
 def process_cloud(cnm):
     "Iterate over all servers in cloud and return list of SSHhost objects"
@@ -131,9 +134,10 @@ def process_cloud(cnm):
 def main(argv):
     "Entry point for main program"
     allclouds = False
-    global DEBUG, VERBOSE
+    global DEBUG, VERBOSE, QUIET
     try:
-        optlist, args = getopt.gnu_getopt(argv, "havd", ("help", "all", "VERBOSE", "DEBUG"))
+        optlist, args = getopt.gnu_getopt(argv, "havdq",
+            ("help", "all", "verbose", "debug", "quiet"))
     except getopt.GetoptError as exc:
         print("Error:", exc, file=sys.stderr)
         return usage()
@@ -143,10 +147,12 @@ def main(argv):
             sys.exit(0)
         elif opt[0] =="-a" or opt[0] == "--all":
             allclouds = True
-        elif opt[0] =="-v" or opt[0] == "--VERBOSE":
+        elif opt[0] =="-v" or opt[0] == "--verbose":
             VERBOSE = True
-        elif opt[0] =="-d" or opt[0] == "--DEBUG":
+        elif opt[0] =="-d" or opt[0] == "--debug":
             DEBUG = True
+        elif opt[0] =="-q" or opt[0] == "--quiet":
+            QUIET = True
         else:
             raise RuntimeError("option parser error")
     if not allclouds and not args:
