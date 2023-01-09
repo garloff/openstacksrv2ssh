@@ -112,6 +112,7 @@ def process_cloud(cnm):
             print(f"No ssh hosts in {sshfn}", file=sys.stderr)
     try:
         conn = openstack.connect(cnm, timeout = 24)
+        conn.config.config['api_timeout'] = 24
         conn.authorize()
     except:
         if not QUIET:
