@@ -17,6 +17,7 @@ import getopt
 import openstack
 import sshhosts
 import servers
+import allclouds
 
 def usage():
     "Help"
@@ -83,6 +84,19 @@ def write_sshcfg(cnm, shosts):
     if not QUIET and len(shosts):
         print(f"{len(shosts)} entries written to {sshfn}")
 
+def write_allsshcfg(fnames):
+    if not fnames:
+        return
+    home = os.environ["HOME"]
+    with open(home + "/.ssh/openstacksrv2ssh.sshcfg", "w", encoding='UTF-8') as ofile:
+        print("# SSH config file including openstack host list files", file=ofile)
+        print("# written by openstacksrv2ssh.py -a, don't change as it will be overwritten",
+                file=ofile)
+        for fnm in fnames:
+            print(f"Include {fnm}", file=ofile)
+    if not QUIET:
+        print(f"{len(fnames)} files included in ~/.ssh/openstacksrv2ssh.sshcfg")
+
 def process_cloud(cnm):
     "Iterate over all servers in cloud and return list of SSHhost objects"
     sshfn = _cfgtempl % cnm
@@ -98,7 +112,10 @@ def process_cloud(cnm):
             print(f"No ssh hosts in {sshfn}", file=sys.stderr)
     try:
         conn = openstack.connect(cnm, timeout = 24)
+        conn.authorize()
     except:
+        if not QUIET:
+            print(f"No connection to cloud {cnm}", file=sys.stderr)
         return nserv
     os_servers = servers.collect_servers(conn)
     # Add / correct OpenStack servers
@@ -133,7 +150,7 @@ def process_cloud(cnm):
 
 def main(argv):
     "Entry point for main program"
-    allclouds = False
+    doall = False
     global DEBUG, VERBOSE, QUIET
     try:
         optlist, args = getopt.gnu_getopt(argv, "havdq",
@@ -146,7 +163,7 @@ def main(argv):
             usage()
             sys.exit(0)
         elif opt[0] =="-a" or opt[0] == "--all":
-            allclouds = True
+            doall = True
         elif opt[0] =="-v" or opt[0] == "--verbose":
             VERBOSE = True
         elif opt[0] =="-d" or opt[0] == "--debug":
@@ -155,14 +172,13 @@ def main(argv):
             QUIET = True
         else:
             raise RuntimeError("option parser error")
-    if not allclouds and not args:
+    if not doall and not args:
         if "OS_CLOUD" in os.environ:
             args = (os.environ["OS_CLOUD"],)
-    if not allclouds and not args:
+    if not doall and not args:
         sys.exit(usage())
-    if allclouds:
-        print("-a not yet implemented!", file=sys.stderr)
-        return 1
+    if doall:
+        args = allclouds.collectallclouds()
     processed = 0
     cloudhostfiles = []
     for cloud in args:
@@ -170,6 +186,7 @@ def main(argv):
         processed += thiscloud
         if thiscloud and allclouds:
             cloudhostfiles.append(_cfgtempl % cloud)
+    write_allsshcfg(cloudhostfiles)
     if processed == 0:
         return 2
     return 0
