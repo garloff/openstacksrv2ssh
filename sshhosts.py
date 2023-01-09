@@ -14,8 +14,10 @@
    collect_sshhosts() returns list of SSHhost objects parsed
    from the passed ssh config file."""
 
-#import os
+import os
 import sys
+
+DEF_SEARCHPATH="~/.ssh:~:."
 
 class SSHhost:
     "class to parse and output some ssh Host settings"
@@ -91,6 +93,27 @@ def collect_sshhosts(fnm):
         processed += noln
     return hosts
 
+def find_sshkeyfile(name, searchpath=DEF_SEARCHPATH):
+    """find_sshkeyfile searches passed searchpath (colon-separated)
+       for ssh keyfiles with name.pem.
+       Returns full absolute filename or None"""
+    # Replace ~ by $HOME dir
+    if "~" in searchpath:
+        home = os.environ["HOME"]
+        searchpath = searchpath.replace("~", home)
+    for path in searchpath.split(":"):
+        # Prepend cwd if not an absoute path
+        if path[0] != "/":
+            path = os.getcwd() + "/" + path
+            # Remove trailing thisdir (cosmetic)
+            if path[-2:] == "/.":
+                path = path[:-2]
+        fname = f"{path}/{name}.pem"
+        if os.access(fname, os.R_OK):
+            return fname
+    return None
+
+
 def main(argv):
     "Entry point for testing"
     for fnm in argv:
@@ -98,6 +121,11 @@ def main(argv):
         hosts = collect_sshhosts(fnm)
         for host in hosts:
             print(f"{host}\n")
+            if host.id_file:
+                last = host.id_file.rfind('/')
+                print(f"#Search for {host.id_file[last+1:-4]}")
+                findidnm = find_sshkeyfile(host.id_file[last+1:-4])
+                print(f"#find_sshkeyfile: {findidnm}")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

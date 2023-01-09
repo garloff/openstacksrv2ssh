@@ -16,7 +16,6 @@ import sys
 import getopt
 import openstack
 import sshhosts
-import sshidentity
 import servers
 
 def usage():
@@ -57,7 +56,7 @@ def fill_values(shost, sshnm, osrv, oconn):
             shost.user = osrv.usernm
     # Any magic to fill in fwd_agent?
     if osrv.keypair and not shost.id_file:
-        keyfile = sshidentity.find_sshkeyfile(osrv.keypair)
+        keyfile = sshhosts.find_sshkeyfile(osrv.keypair)
         if keyfile:
             shost.id_file = keyfile
 
@@ -117,7 +116,8 @@ def process_cloud(cnm):
         shortnm = shost.name[len(cnm)+1:]
         if find_by_name(shortnm, os_servers) == -1:
             if DEBUG:
-                print(f"Remove {shost.name} ({shortnm}) as it's not in OpenStack server list", file=sys.stderr)
+                print(f"Remove {shost.name} ({shortnm}) as it's not in OpenStack server list",
+                      file=sys.stderr)
             ssh_hosts.remove(shost)
     if VERBOSE:
         print(f"# Servers from cloud {cnm}")
