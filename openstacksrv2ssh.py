@@ -21,11 +21,12 @@ import allclouds
 
 def usage():
     "Help"
-    print("Usage: openstacksrv2ssh.py [-d] [-v] -a | [ENV [ENV [...]]]")
+    print("Usage: openstacksrv2ssh.py [options] -a | [ENV [ENV [...]]]")
     print("Creates ~/.ssh/ENV.sshcfg files from OpenStack server lists.")
-    print("-a iterates over all cloud configs known and also generates")
-    print(" ~/.ssh/openstacksrv.sshcfg referencing all non-empty ones")
+    print("-a (or --all) iterates over all cloud configs known and also generates")
+    print(" ~/.ssh/openstacksrv.sshcfg referencing all non-empty ones.")
     print("If OS_CLOUD is set and no ENV passed, it will be used.")
+    print("Options: -v/--verbose, -d/--debug, -q/--quiet and -h/--help.")
     return 1
 
 _home = os.environ["HOME"]
@@ -85,6 +86,7 @@ def write_sshcfg(cnm, shosts):
         print(f"{len(shosts)} entries written to {sshfn}")
 
 def write_allsshcfg(fnames):
+    "Write out openstacksrc2ssh.sshcfg including all others"
     if not fnames:
         return
     home = os.environ["HOME"]
