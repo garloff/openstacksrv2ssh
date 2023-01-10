@@ -28,7 +28,7 @@ def fill_subnetmap(conn):
 
 class OwnNetinfo:
     """The subnets we are connected to"""
-    def __init__(self, conn)
+    def __init__(self, conn):
         self.subnets = []
         self.subnet_names = []
         try:
@@ -67,7 +67,7 @@ class Router:
             return True
         return False
 
-PrivNets = ("192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8")
+PrivNets = ("192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8", "100.64.0.0/10", "169.254.0.0/16" )
 
 def ip_to_int(ipstr):
     "32bit int from four octet IPv4 notation"
@@ -86,6 +86,13 @@ def ip_in_cidr(ipstr, cidr):
     if ip_to_int(net) == ip_to_int(ipstr) & mask:
         return True
     return False 
+
+def is_public(ipstr):
+    "Return True if the ipstr is not private"
+    for privnet in PrivNets:
+        if ip_in_cidr(ipstr, privnet):
+            return False
+    return True
 
 def ownnet_and_routers(conn):
     """Check for own connectivity and connected routers.
@@ -111,7 +118,31 @@ def PreferredIP(ipaddrs, ownnet, routers):
         * If we are in the smae subnet, use the fixed IPv4 address
         * If we find a fixed IP that can be reached by one router hop, use it
         * If we find a public floating IP, use it
-        * If we find a public fixed IP, ipaddrs,         * Otherwise return None
+        * If we find a public fixed IP, ipaddrs,
+        * Otherwise return None
     """
-        
-    
+    if ownnet and ownnet.subnets:
+        # same subnet
+        for netnm in ipaddrs:
+            if netnm in ownnet.subnet_names:
+                ipaddr = extract_ip(ipaddrs[netnm], 'fixed', 4)
+                if ipaddr:
+                    return ipaddr
+        # connected via router (single hop)
+        for netnm in ipaddrs:
+            for router in routers:
+                if router.is_connected(netnm):
+                    ipaddr = extract_ip(ipaddrs[netnm], 'fixed', 4)
+                    if ipaddr:
+                        return ipaddr
+    # floating IP
+    ipaddr = get_floating_ip(ipaddrs)
+    if ipaddr:
+        return ipaddr
+    # fixed ip with public address
+    for netnm in ipaddrs:
+        ipaddr = extract_ip(ipaddrs[netnm], 'fixed', 4)
+        if ipaddr:
+            if is_public(ipaddr):
+                return ipaddr
+    return None
