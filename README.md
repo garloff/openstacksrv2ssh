@@ -26,12 +26,17 @@ the OpenStack API of all clouds that are configured in your `clouds.yaml` /
 * Run `openstacksrv2ssh.py -a` regularly or `openstacksrv2ssh.py $OS_CLOUD`
   prior to using ssh or scp.
 
+## Goodies
+
+* When run on a VM in a cloud, locally accessible IP addresses from other
+  servers are being detected (in same subnet or connected via a single
+  hop router) and used in preference over a floating IP.
+
 ## Limitations and TODOs
 
 * The names of the host aliases are currently hardcoded as `$OS_CLOUD-$VMNAME`,
   which we may make configurable later.
-* We currently exclusively look for IPv4 floating IP addresses; we may allow
-  public fixed addresses or even private fixed IP addresses (in case we are
-  in the same cloud and connected to the same router or subnet) later.
+* We currently exclusively look for IPv4 IP addresses; we may allow IPv6
+  later.
 * The .sshcfg files are overwritten and custom changes have a limited chance
   to survive.

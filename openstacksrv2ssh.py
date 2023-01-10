@@ -18,6 +18,7 @@ import openstack
 import sshhosts
 import servers
 import allclouds
+import ipconnected
 
 def usage():
     "Help"
@@ -46,11 +47,10 @@ def find_by_name(srch, lst):
         idx += 1
     return -1
 
-def fill_values(shost, sshnm, osrv, oconn):
+def fill_values(shost, sshnm, osrv, ipaddr, oconn):
     """Fill in SSHhost fields from osrv, with name sshnm,
         using oconn to query more data if needed."""
     shost.name = sshnm
-    ipaddr = servers.get_floating_ip(osrv.ipaddrs, DEBUG)
     if ipaddr:
         shost.hostname = ipaddr
     if not shost.user:
@@ -63,13 +63,13 @@ def fill_values(shost, sshnm, osrv, oconn):
         if keyfile:
             shost.id_file = keyfile
 
-def ssh_host_from_srv(osrv, oconn, sshnm=None):
+def ssh_host_from_srv(osrv, ipaddr, oconn, sshnm=None):
     """Create new SSHhost object from osrv.
        Only returns object if hostname is set."""
     if not sshnm:
         sshnm = osrv.name
     shost = sshhosts.SSHhost()
-    fill_values(shost, sshnm, osrv, oconn)
+    fill_values(shost, sshnm, osrv, ipaddr, oconn)
     if shost.hostname:
         return shost
     return None
@@ -102,14 +102,12 @@ def write_allsshcfg(fnames):
 def process_cloud(cnm):
     "Iterate over all servers in cloud and return list of SSHhost objects"
     sshfn = _cfgtempl % cnm
-    nserv = 0
+    ssh_hosts = []
     if os.access(sshfn, os.R_OK):
         ssh_hosts = sshhosts.collect_sshhosts(sshfn)
-        nserv = len(ssh_hosts)
         if DEBUG:
-            print(f"Found {nserv} ssh hosts in {sshfn}", file=sys.stderr)
+            print(f"Found {len(ssh_hosts)} ssh hosts in {sshfn}", file=sys.stderr)
     else:
-        ssh_hosts = []
         if DEBUG:
             print(f"No ssh hosts in {sshfn}", file=sys.stderr)
     try:
@@ -119,21 +117,23 @@ def process_cloud(cnm):
     except:
         if not QUIET:
             print(f"No connection to cloud {cnm}", file=sys.stderr)
-        return nserv
+        return len(ssh_hosts)
     os_servers = servers.collect_servers(conn)
+    ownnet, routers = ipconnected.ownnet_and_routers(conn, DEBUG)
     # Add / correct OpenStack servers
     for srv in os_servers:
+        ipaddr = ipconnected.preferred_ip(srv.ipaddrs, ownnet, routers, DEBUG)
         sshnm = _nametempl % (cnm, srv.name)
         idx = find_by_name(sshnm, ssh_hosts)
         if DEBUG:
             print(f"OpenStack Server {sshnm} in ssh list: {idx}")
         if idx == -1:
-            newhost = ssh_host_from_srv(srv, conn, sshnm)
+            newhost = ssh_host_from_srv(srv, ipaddr, conn, sshnm)
             if newhost:
                 ssh_hosts.append(newhost)
         else:
             host = ssh_hosts[idx]
-            fill_values(host, sshnm, srv, conn)
+            fill_values(host, sshnm, srv, ipaddr, conn)
     # Remove servers that no longer exist
     for shost in ssh_hosts:
         shortnm = shost.name[len(cnm)+1:]

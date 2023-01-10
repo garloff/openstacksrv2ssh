@@ -62,31 +62,6 @@ class OStackServer:
 		f"keypair={self.keypair}, flavor={self.flavor}, image={self.image}, " \
 		f"usernm={self.usernm}"
 
-def extract_ip(ipnets, iptype, version=4, debug=False):
-    "extract the ip address"
-    for netobj in ipnets:
-        if netobj['version'] == version and netobj['OS-EXT-IPS:type'] == iptype:
-            ipaddr = netobj['addr']
-            if debug:
-                print(f"{ipaddr}", file=sys.stderr)
-            return ipaddr
-    return None
-
-def get_ip(ipaddrs, iptype, version=4, debug=False):
-    """Iterate over networks in ipaddrs to find IP that matches
-       iptype ('fixed' or 'floating') and ip version.
-       Return none if not found.
-    """
-    for netnm in ipaddrs:
-        ipaddr = extract_ip(ipaddrs[netnm], iptype, version, debug)
-        if ipaddr:
-            return ipaddr
-    return None 
-
-def get_floating_ip(ipaddrs, debug=False):
-    "Return floating IPv4 address if it exists"
-    return get_ip(ipaddrs, "floating", 4, debug)
-
 def collect_servers(ostackconn, collectfull = False):
     """Uses ostackconn to get server list and returns a list of
        OStackServer objects. collectfull controls whether we also
