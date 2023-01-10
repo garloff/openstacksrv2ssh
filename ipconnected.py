@@ -41,8 +41,10 @@ class OwnNetInfo:
                                 timeout=3)
         except:
             return
+        if not ans.ok:
+            return
         fill_subnetmap(conn)
-        jnet = json.loads(ans)
+        jnet = json.loads(ans.text)
         for net in jnet["networks"]:
             net_id = net["network_id"]
             netinfo = conn.network.get_network(net_id)
@@ -53,18 +55,21 @@ class OwnNetInfo:
 
 class Router:
     """Class to hold router properties along with connected subnet IDs."""
-    def __init__(self, conn, robj):
+    def __init__(self, conn, robj, debug=False):
         "c'tor, creating list of connected subnets"
         self.router = robj
         self.subnets = []
         self.subnet_names = []
         filters = {}
         filters['device_id'] = robj.id
-        for port in conn.network.ports(filters):
+        for port in conn.network.ports(**filters):
             if port.device_owner == "network_router:gateway":
                 continue
             for ip_spec in port.fixed_ips:
                 snetid = ip_spec.get('subnet_id')
+                if debug:
+                    print(f"Router {robj.name} connected to subnet {Subnet_Names[snetid]}",
+                          file=sys.stderr)
                 self.subnets.append(snetid)
                 self.subnet_names.append(Subnet_Names[snetid])
     def is_connected(self, subnet):
@@ -114,14 +119,14 @@ def ownnet_and_routers(conn, debug=False):
         return(None, (None,))
     routers = []
     for router in conn.network.routers():
-        rtr = Router(conn, router)
+        rtr = Router(conn, router, debug)
         # filter only routers connected to us
         for subnet in ownnet.subnets:
             if rtr.is_connected(subnet):
                 routers.append(rtr)
                 break
     if debug:
-        print(f"We are connected to routers {map(lambda x: x.router.name, routers)}",
+        print(f"We are connected to routers {list(map(lambda x: x.router.name, routers))}",
                 file=sys.stderr)
     return ownnet, routers
 
