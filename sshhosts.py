@@ -17,7 +17,7 @@
 import os
 import sys
 
-DEF_SEARCHPATH="~/.ssh:~:."
+DEF_SEARCHPATH="~/.ssh:~:.:~/openstack-health-monitor"
 
 class SSHhost:
     "class to parse and output some ssh Host settings"
