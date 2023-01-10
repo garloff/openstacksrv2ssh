@@ -50,9 +50,9 @@ def fill_values(shost, sshnm, osrv, oconn):
     """Fill in SSHhost fields from osrv, with name sshnm,
         using oconn to query more data if needed."""
     shost.name = sshnm
-    ipaddr = osrv.get_ip(DEBUG)
+    ipaddr = servers.get_floating_ip(osrv.ipaddrs, DEBUG)
     if ipaddr:
-        shost.hostname = osrv.get_ip()
+        shost.hostname = ipaddr
     if not shost.user:
         osrv.collectinfo2(oconn)
         if osrv.usernm:
@@ -189,7 +189,8 @@ def main(argv):
         processed += thiscloud
         if thiscloud and allclouds:
             cloudhostfiles.append(_cfgtempl % cloud)
-    write_allsshcfg(cloudhostfiles)
+    if doall:
+        write_allsshcfg(cloudhostfiles)
     if processed == 0:
         return 2
     return 0
