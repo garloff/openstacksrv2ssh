@@ -40,18 +40,27 @@ class OStackServer:
         self.keypair = srvlistentry.key_name
         self.flavor = srvlistentry.flavor["original_name"]
         self.image = srvlistentry.image.id
+        self.vols = srvlistentry.attached_volumes
         return self
     def collectinfo2(self, ostackconn):
         "investigate image properties to find ssh user name"
         if not self.image:
-            return self
+            if not self.vols:
+                return self
+            volinfo = ostackconn.volume.get_volume(self.vols[0]["id"])
+            vmeta = volinfo.volume_image_metadata
+            if not vmeta or not 'image_id' in vmeta:
+                return self
+            self.image = vmeta.get('image_id')
         img = ostackconn.image.get_image(self.image)
         if "image_original_user" in img.properties:
             self.usernm = img.properties["image_original_user"]
         else:
+            if "os_distro" in img.properties:
+                distro = img.properties["os_distro"]
             # FIXME: Should we really guess image user names based on image name?
             # ubuntu
-            if img.name[:6] == "Ubuntu" or img.name[:6] == "ubuntu":
+            if img.name[:6] == "Ubuntu" or img.name[:6] == "ubuntu" or distro == "ubuntu":
                 self.usernm = "ubuntu"
             # we could do others ...
         return self
