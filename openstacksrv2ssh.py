@@ -126,7 +126,7 @@ def process_cloud(cnm):
         sshnm = _nametempl % (cnm, srv.name)
         idx = find_by_name(sshnm, ssh_hosts)
         if DEBUG:
-            print(f"OpenStack Server {sshnm} in ssh list: {idx}")
+            print(f"OpenStack Server {sshnm} in ssh list: {idx}, IP {ipaddr}")
         if idx == -1:
             newhost = ssh_host_from_srv(srv, ipaddr, conn, sshnm)
             if newhost:

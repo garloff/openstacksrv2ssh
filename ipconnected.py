@@ -22,6 +22,8 @@ import requests
 
 Subnet_Names = {}
 Subnet_IDs = {}
+Subnet_Net = {}
+Network_IDs = {}
 
 def fill_subnetmap(conn):
     "Create maps for subnet ID->name and name->ID"
@@ -29,6 +31,10 @@ def fill_subnetmap(conn):
     for subnet in conn.network.subnets():
         Subnet_Names[subnet.id] = subnet.name
         Subnet_IDs[subnet.name] = subnet.id
+        if subnet.ip_version == 4:
+            Subnet_Net[subnet.network_id] = subnet.id
+    for net in conn.network.networks():
+        Network_IDs[net.name] = net.id
 
 
 class OwnNetInfo:
@@ -36,6 +42,8 @@ class OwnNetInfo:
     def __init__(self, conn):
         self.subnets = []
         self.subnet_names = []
+        self.nets = []
+        self.net_names = []
         try:
             ans = requests.get("http://169.254.169.254/openstack/latest/network_data.json",
                                 timeout=3)
@@ -49,6 +57,8 @@ class OwnNetInfo:
             net_id = net["network_id"]
             try:
                 netinfo = conn.network.get_network(net_id)
+                self.nets.append(net)
+                self.net_names.append(netinfo.name)
             except:
                 print(f"Could not retrieve info for network {net_id}", file=sys.stderr)
                 continue
@@ -140,7 +150,7 @@ def extract_ip(ipnets, iptype, version=4, debug=False):
         if netobj['version'] == version and netobj['OS-EXT-IPS:type'] == iptype:
             ipaddr = netobj['addr']
             if debug:
-                print(f"{ipaddr}", file=sys.stderr)
+                print(f"=> {ipaddr} ({iptype}, IPv{version})", file=sys.stderr)
             return ipaddr
     return None
 
@@ -171,15 +181,19 @@ def preferred_ip(ipaddrs, ownnet, routers, debug=False):
     if ownnet and ownnet.subnets:
         # same subnet
         for netnm in ipaddrs:
-            if netnm in ownnet.subnet_names:
+            if netnm in ownnet.net_names:
                 ipaddr = extract_ip(ipaddrs[netnm], 'fixed', 4, debug)
+                if debug:
+                    print(f"=> IP address same net {netnm}: {ipaddr}", file=sys.stderr)
                 if ipaddr:
                     return ipaddr
         # connected via router (single hop)
         for netnm in ipaddrs:
             for router in routers:
-                if router.is_connected(netnm):
+                if router.is_connected(Subnet_Net[Network_IDs[netnm]]):
                     ipaddr = extract_ip(ipaddrs[netnm], 'fixed', 4, debug)
+                    if debug:
+                        print(f"=> IP address routed {router.router.name}: {ipaddr}", file=sys.stderr)
                     if ipaddr:
                         return ipaddr
     # floating IP
@@ -189,7 +203,8 @@ def preferred_ip(ipaddrs, ownnet, routers, debug=False):
     # fixed ip with public address
     for netnm in ipaddrs:
         ipaddr = extract_ip(ipaddrs[netnm], 'fixed', 4, debug)
-        if ipaddr:
-            if is_public(ipaddr):
-                return ipaddr
+        if ipaddr and is_public(ipaddr):
+            return ipaddr
+    if debug:
+        print("No suitable address found", file=sys.stderr)
     return None
