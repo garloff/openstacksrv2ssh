@@ -56,6 +56,7 @@ class OStackServer:
         if "image_original_user" in img.properties:
             self.usernm = img.properties["image_original_user"]
         else:
+            distro = None
             if "os_distro" in img.properties:
                 distro = img.properties["os_distro"]
             # FIXME: Should we really guess image user names based on image name?
