@@ -55,9 +55,13 @@ class OwnNetInfo:
         jnet = json.loads(ans.text)
         for net in jnet["networks"]:
             net_id = net["network_id"]
-            netinfo = conn.network.get_network(net_id)
-            self.nets.append(net)
-            self.net_names.append(netinfo.name)
+            try:
+                netinfo = conn.network.get_network(net_id)
+                self.nets.append(net)
+                self.net_names.append(netinfo.name)
+            except:
+                print(f"Could not retrieve info for network {net_id}", file=sys.stderr)
+                continue
             for snet in netinfo.subnet_ids:
                 self.subnets.append(snet)
                 self.subnet_names.append(Subnet_Names[snet])
