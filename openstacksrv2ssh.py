@@ -99,6 +99,29 @@ def write_allsshcfg(fnames):
     if not QUIET:
         print(f"{len(fnames)} files included in ~/.ssh/openstacksrv2ssh.sshcfg")
 
+def connect(cnm):
+    "Try to establish an authorized connection to cloud cnm"
+    try:
+        conn = openstack.connect(cnm, timeout=16, api_timout=24)
+        conn.authorize()
+    except BaseException as exc:
+        try:
+            if conn:
+                # Connection succeeded, authorization did not, so retry with default domain
+                conn = openstack.connect(cnm, timeout=16, api_timout=24,
+                                         default_domain='default', project_domain_id='default')
+                conn.authorize()
+            else:
+                raise exc
+        except:
+            if not QUIET:
+                print(f"No connection to cloud {cnm}", file=sys.stderr)
+            if VERBOSE:
+                print(f"{exc}", file=sys.stderr)
+            return None
+    return conn
+
+
 def process_cloud(cnm):
     "Iterate over all servers in cloud and return list of SSHhost objects"
     sshfn = _cfgtempl % cnm
@@ -110,14 +133,9 @@ def process_cloud(cnm):
     else:
         if DEBUG:
             print(f"No ssh hosts in {sshfn}", file=sys.stderr)
-    try:
-        conn = openstack.connect(cnm, timeout = 24)
-        conn.config.config['api_timeout'] = 24
-        conn.authorize()
-    except:
-        if not QUIET:
-            print(f"No connection to cloud {cnm}", file=sys.stderr)
-        return len(ssh_hosts)
+    conn = connect(cnm)
+    if not conn:
+        return 0
     os_servers = servers.collect_servers(conn)
     ownnet, routers = ipconnected.ownnet_and_routers(conn, DEBUG)
     # Add / correct OpenStack servers
