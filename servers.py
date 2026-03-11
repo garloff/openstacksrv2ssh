@@ -52,18 +52,21 @@ class OStackServer:
             if not vmeta or not 'image_id' in vmeta:
                 return self
             self.image = vmeta.get('image_id')
-        img = ostackconn.image.get_image(self.image)
-        if "image_original_user" in img.properties:
-            self.usernm = img.properties["image_original_user"]
-        else:
-            distro = None
-            if "os_distro" in img.properties:
-                distro = img.properties["os_distro"]
-            # FIXME: Should we really guess image user names based on image name?
-            # ubuntu
-            if img.name[:6] == "Ubuntu" or img.name[:6] == "ubuntu" or distro == "ubuntu":
-                self.usernm = "ubuntu"
-            # we could do others ...
+        try:
+            img = ostackconn.image.get_image(self.image)
+            if "image_original_user" in img.properties:
+                self.usernm = img.properties["image_original_user"]
+            else:
+                distro = None
+                if "os_distro" in img.properties:
+                    distro = img.properties["os_distro"]
+                # FIXME: Should we really guess image user names based on image name?
+                # ubuntu
+                if img.name[:6] == "Ubuntu" or img.name[:6] == "ubuntu" or distro == "ubuntu":
+                    self.usernm = "ubuntu"
+                # we could do others ...
+        except:
+            self.usernm = None
         return self
 
     def __str__(self):
