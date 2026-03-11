@@ -101,14 +101,16 @@ def write_allsshcfg(fnames):
 
 def connect(cnm):
     "Try to establish an authorized connection to cloud cnm"
+    if VERBOSE:
+        print(f"Connecting to cloud env {cnm}")
     try:
-        conn = openstack.connect(cnm, timeout=16, api_timout=24)
+        conn = openstack.connect(cnm, timeout=12, api_timout=24)
         conn.authorize()
     except BaseException as exc:
         try:
             if conn:
                 # Connection succeeded, authorization did not, so retry with default domain
-                conn = openstack.connect(cnm, timeout=16, api_timout=24,
+                conn = openstack.connect(cnm, timeout=12, api_timout=24,
                                          default_domain='default', project_domain_id='default')
                 conn.authorize()
             else:
